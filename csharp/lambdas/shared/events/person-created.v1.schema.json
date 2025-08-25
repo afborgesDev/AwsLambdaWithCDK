@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/person-created.v1.schema.json",
+  "title": "PersonCreatedV1Detail",
+  "type": "object",
+  "required": ["version", "personId", "firstName", "lastName", "phoneE164", "address", "createdAt", "correlationId"],
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "personId": { "type": "string" },
+    "firstName": { "type": "string" },
+    "lastName": { "type": "string" },
+    "phoneE164": { "type": "string" },
+    "address": {
+      "type": "object",
+      "required": ["street", "number", "city", "postalCode", "country"],
+      "properties": {
+        "street": { "type": "string" },
+        "number": { "type": "string" },
+        "city": { "type": "string" },
+        "postalCode": { "type": "string" },
+        "country": { "type": "string", "minLength": 2, "maxLength": 2 }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string" }
+  },
+  "additionalProperties": false
+}
