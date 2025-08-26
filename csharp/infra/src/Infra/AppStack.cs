@@ -58,7 +58,7 @@ public class AppStack : Stack
         
         var listFunction = new DockerImageFunction(this, $"{appStackPrefix}-ListFunction", new DockerImageFunctionProps {
             FunctionName = $"{appStackPrefix}--list",
-            Code = BuildDockerImageCode("ListPersons"),
+            Code = BuildDockerImageCode("ListPerson"),
             Timeout = _lambdaTimeout,
             MemorySize = DefaultMemSize
         });

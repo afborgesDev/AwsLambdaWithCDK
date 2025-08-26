@@ -27,7 +27,7 @@ public class FunctionTests : IClassFixture<IntegrationFixture>
             LastName = "Borges"
         };
         
-        var request = new APIGatewayProxyRequest() {Body = JsonSerializer.Serialize(input)};
+        var request = new APIGatewayProxyRequest {Body = JsonSerializer.Serialize(input)};
 
         var response = await function.FunctionHandler(request, new TestLambdaContext());
         

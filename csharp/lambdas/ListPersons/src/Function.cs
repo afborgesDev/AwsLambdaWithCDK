@@ -1,21 +1,44 @@
+using System.Text.Json;
+using Amazon.Lambda.Annotations;
+using Amazon.Lambda.Annotations.APIGateway;
+using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
+using PersonService.Shared.Extensions;
+using PersonService.Shared.Repositories;
 
-// Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
 
-namespace ListPersons;
+namespace ListPerson;
 
 public class Function
 {
-    
-    /// <summary>
-    /// A simple function that takes a string and does a ToUpper
-    /// </summary>
-    /// <param name="input">The event for the Lambda function handler to process.</param>
-    /// <param name="context">The ILambdaContext that provides methods for logging and describing the Lambda environment.</param>
-    /// <returns></returns>
-    public string FunctionHandler(string input, ILambdaContext context)
+    private readonly IPersonRepository _personRepository;
+
+    public Function(IPersonRepository personRepository)
     {
-        return input.ToUpper();
+        _personRepository = personRepository;
+    }
+    
+    [LambdaFunction]
+    [RestApi(LambdaHttpMethod.Get, "/persons")]
+    public async Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest request,
+        ILambdaContext context)
+    {
+        using var cts = context.GetCancellationTokenSource();
+        try
+        {
+            var items = await _personRepository.GetAllAsync(cts.Token);
+            if (items.Count == 0)
+            {
+                return new() { StatusCode = 204 };
+            }
+            
+            return new() { Body = JsonSerializer.Serialize(items), StatusCode = 200 };
+        }
+        catch (Exception e)
+        {
+            context.Logger.LogLine(e.Message);
+            return new() {StatusCode = 500};
+        }
     }
 }
