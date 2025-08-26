@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using Amazon.CDK;
 using Amazon.CDK.AWS.APIGateway;
 using Amazon.CDK.AWS.DynamoDB;
@@ -51,21 +53,21 @@ public class AppStack : Stack
         var createFunction = new DockerImageFunction(this, $"{appStackPrefix}-CreateFunction", new DockerImageFunctionProps
         {
             FunctionName = $"{appStackPrefix}-CreateFunction",
-            Code = BuildDockerImageCode("CreatePerson"),
+            Code = BuildDockerImageCode("CreatePerson/src"),
             MemorySize = DefaultMemSize,
             Timeout = _lambdaTimeout,
         });
         
         var listFunction = new DockerImageFunction(this, $"{appStackPrefix}-ListFunction", new DockerImageFunctionProps {
-            FunctionName = $"{appStackPrefix}--list",
-            Code = BuildDockerImageCode("ListPerson"),
+            FunctionName = $"{appStackPrefix}-ListFunction",
+            Code = BuildDockerImageCode("ListPersons/src"),
             Timeout = _lambdaTimeout,
             MemorySize = DefaultMemSize
         });
         
         var outBoxFunction = new DockerImageFunction(this, $"{appStackPrefix}-OutboxFunction", new DockerImageFunctionProps {
             FunctionName = $"{appStackPrefix}-outbox-publisher",
-            Code = BuildDockerImageCode("OutboxPublisher"),
+            Code = BuildDockerImageCode("OutboxPublisher/src"),
             Timeout = Duration.Seconds(30),
             MemorySize = DefaultMemSize
         });
@@ -74,7 +76,7 @@ public class AppStack : Stack
             ["TABLE_PERSONS"] = props.PersonsTable.TableName,
             ["TABLE_OUTBOX"]  = props.OutboxTable.TableName,
             ["TABLE_IDEMPOTENCY"] = props.IdempotencyTable.TableName,
-            ["BUS_ARN"] = bus.EventBusArn,
+            ["EVENT_BUS"] = bus.EventBusName,
             ["REQUIRE_IDEMPOTENCY_KEY"] = "true",
             ["LOG_LEVEL"] = "Info"
         };
@@ -117,11 +119,21 @@ public class AppStack : Stack
         _ = new CfnOutput(this, "OutboxTable", new CfnOutputProps { Value = props.OutboxTable.TableName });
         _ = new CfnOutput(this, "IdempotencyTable", new CfnOutputProps { Value = props.IdempotencyTable.TableName });
     }
-    
-    private static DockerImageCode BuildDockerImageCode(string dockerImageName) =>
-        DockerImageCode.FromImageAsset(
-            "Lambdas", 
-            new AssetImageCodeProps { File = $"{dockerImageName}/Dockerfile" });
+
+    private static DockerImageCode BuildDockerImageCode(string dockerImageName)
+    {
+        var root = RepoRootLocator.Find();
+        var lambdasDir = Path.Combine(root, "lambdas");
+        var dockerfile = Path.Combine(lambdasDir, dockerImageName, "Dockerfile");
+
+        if (!File.Exists(dockerfile))
+            throw new Exception($"Cannot find Dockerfile at {dockerfile}");
+
+        return DockerImageCode.FromImageAsset(
+            lambdasDir,
+            new AssetImageCodeProps { File = $"{dockerImageName}/Dockerfile" }
+        );
+    }
     
     private static void AddCorsOptions(IResource apiResource)
     {
@@ -164,5 +176,23 @@ public class AppStack : Stack
         {
             lambda.AddEnvironment(key, value);
         }
+    }
+}
+
+internal static class RepoRootLocator
+{
+    public static string Find()
+    {
+        var dir = AppDomain.CurrentDomain.BaseDirectory!;
+        while (dir is not null)
+        {
+            var lambdasDir = Path.Combine(dir, "lambdas");
+            if (Directory.Exists(lambdasDir)) return dir;
+
+            var parent = Directory.GetParent(dir)?.FullName;
+            if (string.IsNullOrEmpty(parent) || parent == dir) break;
+            dir = parent;
+        }
+        throw new Exception("Cannot locate repository root containing 'lambdas' directory.");
     }
 }

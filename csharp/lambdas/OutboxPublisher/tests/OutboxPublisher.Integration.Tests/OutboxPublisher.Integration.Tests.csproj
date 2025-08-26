@@ -30,6 +30,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\src\OutboxPublisherFunction.csproj" />
       <ProjectReference Include="..\..\src\OutboxPublisherFunction\src\OutboxPublisherFunction\OutboxPublisherFunction.csproj" />
     </ItemGroup>
 
