@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Options;
@@ -19,11 +20,16 @@ public interface IPersonRepository
 public sealed class PersonRepository : IPersonRepository
 {
     private readonly IAmazonDynamoDB _dynamoDbClient;
+    private readonly IOutboxRepository _outboxRepository;
     private readonly IOptions<DynamoDbOptions> _options;
 
-    public PersonRepository(IAmazonDynamoDB dynamoDbClient, IOptions<DynamoDbOptions> options)
+    public PersonRepository(
+        IAmazonDynamoDB dynamoDbClient, 
+        IOutboxRepository outboxRepository, 
+        IOptions<DynamoDbOptions> options)
     {
         _dynamoDbClient = dynamoDbClient;
+        _outboxRepository = outboxRepository;
         _options = options;
     }
 
@@ -31,20 +37,43 @@ public sealed class PersonRepository : IPersonRepository
     {
         item.Id = string.IsNullOrWhiteSpace(item.Id) ? Guid.NewGuid().ToString("N") : item.Id;
 
-        // Map and write with conditional insert
-        var put = new PutItemRequest
+        var personPut = new TransactWriteItem
         {
-            TableName = _options.Value.PersonTable,
-            Item = PersonMapper.MapToAttributes(item),
-            ConditionExpression = "attribute_not_exists(#id)",
-            ExpressionAttributeNames = new()
-            {
-                ["#id"] = PersonMapper.Id
-            }
+            Put =
+                new()
+                {
+                    TableName = _options.Value.PersonTable,
+                    Item = PersonMapper.MapToAttributes(item),
+                    ConditionExpression = "attribute_not_exists(#id)",
+                    ExpressionAttributeNames =
+                        new()
+                        {
+                            ["#id"] = PersonMapper.Id
+                        }
+                }
         };
+        
+        var outboxEvent = new
+        {
+            personId = item.Id,
+            firstName = item.FirstName,
+            lastName = item.LastName,
+            phoneNumber = item.PhoneNumber,
+            address = item.Address
+        };
+        
+        var outbox = new OutboxRecord
+        {
+            AggregateId = item.Id,
+            PayloadJson = JsonSerializer.Serialize(outboxEvent)
+        };
+        
         try
         {
-            await _dynamoDbClient.PutItemAsync(put, cancellationToken);
+            await _dynamoDbClient.TransactWriteItemsAsync(new()
+            {
+                TransactItems = [personPut, _outboxRepository.BuildPutPending(outbox)],
+            }, cancellationToken);
         }
         catch (Exception e)
         {

@@ -11,11 +11,13 @@ namespace ListPersons.Integration.Tests;
 public class IntegrationFixture : IAsyncLifetime, IDisposable
 {
     private readonly DynamoDbContainer _container;
-    public string ServiceUrl { get; private set; } = default!;
-    public IAmazonDynamoDB DynamoDbClient { get; private set; } = default!;
-    public string PersonsTableName => "Persons";
+    private string ServiceUrl { get; set; } = default!;
+    private IAmazonDynamoDB DynamoDbClient { get; set; } = default!;
+    private string PersonsTableName => "Persons";
+    private string OutboxTableName => "Outbox";
     
     public IPersonRepository PersonRepository { get; private set; }
+    public IOutboxRepository OutboxRepository { get; private set; }
     
     public IntegrationFixture()
     {
@@ -34,9 +36,13 @@ public class IntegrationFixture : IAsyncLifetime, IDisposable
             new BasicAWSCredentials("test", "test"),
             new AmazonDynamoDBConfig { ServiceURL = ServiceUrl });
 
-        await EnsureTablesAsync();
+        var options = Options.Create(
+            new DynamoDbOptions { PersonTable = PersonsTableName, OutboxTable = OutboxTableName});
         
-        PersonRepository = new PersonRepository(DynamoDbClient, Options.Create(new DynamoDbOptions {PersonTable = "Persons"}));
+        await EnsureTablesAsync();
+
+        OutboxRepository = new OutboxRepository(DynamoDbClient, options);
+        PersonRepository = new PersonRepository(DynamoDbClient, OutboxRepository, options);
     }
     
     private async Task EnsureTablesAsync()
@@ -46,17 +52,29 @@ public class IntegrationFixture : IAsyncLifetime, IDisposable
         {
             if (!await TableExistsAsync(DynamoDbClient, PersonsTableName))
             {
-                await DynamoDbClient.CreateTableAsync(new CreateTableRequest
+                await DynamoDbClient.CreateTableAsync(new()
                 {
                     TableName = PersonsTableName,
-                    AttributeDefinitions = new()
-                    {
-                        new("Id", ScalarAttributeType.S),
-                    },
-                    KeySchema = new() { new KeySchemaElement("Id", KeyType.HASH) },
+                    AttributeDefinitions = [new("Id", ScalarAttributeType.S),],
+                    KeySchema = [new("Id", KeyType.HASH)],
                     BillingMode = BillingMode.PAY_PER_REQUEST
                 });
                 await WaitForActiveAsync(DynamoDbClient, PersonsTableName, TimeSpan.FromSeconds(30));
+            }
+        }
+        
+        if (!existing.TableNames.Contains(OutboxTableName))
+        {
+            if (!await TableExistsAsync(DynamoDbClient, OutboxTableName))
+            {
+                await DynamoDbClient.CreateTableAsync(new()
+                {
+                    TableName = OutboxTableName,
+                    AttributeDefinitions = [new("Id", ScalarAttributeType.S),],
+                    KeySchema = [new("Id", KeyType.HASH)],
+                    BillingMode = BillingMode.PAY_PER_REQUEST
+                });
+                await WaitForActiveAsync(DynamoDbClient, OutboxTableName, TimeSpan.FromSeconds(30));
             }
         }
     }
@@ -74,7 +92,8 @@ public class IntegrationFixture : IAsyncLifetime, IDisposable
         }
     }
 
-    private static async Task WaitForActiveAsync(IAmazonDynamoDB ddb, string tableName, TimeSpan timeout, int pollMs = 500)
+    private static async Task WaitForActiveAsync(
+        IAmazonDynamoDB ddb, string tableName, TimeSpan timeout, int pollMs = 500)
     {
         var start = DateTime.UtcNow;
         while (DateTime.UtcNow - start < timeout)
@@ -85,10 +104,13 @@ public class IntegrationFixture : IAsyncLifetime, IDisposable
                 var status = resp.Table.TableStatus;
                 if (status == TableStatus.ACTIVE || status == TableStatus.UPDATING) return;
             }
-            catch (ResourceNotFoundException) { /* still creating */ }
+            catch (ResourceNotFoundException)
+            {
+            }
             await Task.Delay(pollMs);
         }
-        throw new TimeoutException($"DynamoDB table '{tableName}' did not become ACTIVE within {timeout.TotalSeconds}s.");
+        throw new TimeoutException(
+            $"DynamoDB table '{tableName}' did not become ACTIVE within {timeout.TotalSeconds}s.");
     }
 
     public async Task DisposeAsync()

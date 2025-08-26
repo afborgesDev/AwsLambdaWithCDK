@@ -21,8 +21,8 @@ public class Function
     
     [LambdaFunction]
     [RestApi(LambdaHttpMethod.Get, "/persons")]
-    public async Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest request,
-        ILambdaContext context)
+    public async Task<APIGatewayProxyResponse> FunctionHandler(
+        APIGatewayProxyRequest request, ILambdaContext context)
     {
         using var cts = context.GetCancellationTokenSource();
         try

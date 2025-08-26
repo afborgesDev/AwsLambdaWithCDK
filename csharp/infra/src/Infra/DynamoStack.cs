@@ -16,7 +16,7 @@ public class DynamoStack : Stack
 
     public DynamoStack(Construct scope, string id, StackProps? props = null) : base(scope, id, props)
     {
-        PersonsTable = new(this, PersonTableName, new TableProps()
+        PersonsTable = new(this, PersonTableName, new TableProps
         {
             PartitionKey = new Attribute
             {
@@ -27,7 +27,7 @@ public class DynamoStack : Stack
             TableName = PersonTableName,
         });
         
-        OutboxTable = new(this, OutboxTableName, new TableProps()
+        OutboxTable = new(this, OutboxTableName, new TableProps
         {
             PartitionKey = new Attribute
             {
@@ -40,7 +40,7 @@ public class DynamoStack : Stack
             TimeToLiveAttribute = "ttl",
         });
         
-        IdempotencyTable = new(this, IdepotencyTableName, new TableProps()
+        IdempotencyTable = new(this, IdepotencyTableName, new TableProps
         {
             PartitionKey = new Attribute
             {

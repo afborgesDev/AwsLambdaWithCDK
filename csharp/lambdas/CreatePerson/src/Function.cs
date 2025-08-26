@@ -33,6 +33,7 @@ public class Function
             {
                 return _badRequestResponse;
             }
+            
             var itemToCreate = JsonSerializer.Deserialize<PersonModel>(request.Body);
             if (itemToCreate == null)
             {

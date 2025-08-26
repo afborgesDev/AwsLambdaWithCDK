@@ -83,7 +83,6 @@ public class AppStack : Stack
         SetupEnvironments(lambdaEnv, listFunction);
         SetupEnvironments(lambdaEnv, outBoxFunction);
         
-        
         props.PersonsTable.GrantReadWriteData(createFunction);
         props.OutboxTable.GrantReadWriteData(createFunction);
         props.IdempotencyTable.GrantReadWriteData(createFunction);
@@ -166,5 +165,4 @@ public class AppStack : Stack
             lambda.AddEnvironment(key, value);
         }
     }
-    
 }

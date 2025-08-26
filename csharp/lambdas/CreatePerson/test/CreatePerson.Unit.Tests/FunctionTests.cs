@@ -40,7 +40,8 @@ public class FunctionTests
     public async Task CreatePerson_ShouldReturnInternalServerError_WhenAnErrorHapen()
     {
         var input = new PersonModel { FirstName = "X", LastName = "Y" };
-        _personRepository.CreateOneAsync(Arg.Any<PersonModel>(), Arg.Any<CancellationToken>()).ThrowsAsync(new Exception("x"));
+        _personRepository.CreateOneAsync(
+            Arg.Any<PersonModel>(), Arg.Any<CancellationToken>()).ThrowsAsync(new Exception("x"));
         
         var req = new APIGatewayProxyRequest { Body = JsonSerializer.Serialize(input) };
         

@@ -28,7 +28,7 @@ public class FunctionTests: IClassFixture<IntegrationFixture>
     }
     
     [Fact]
-    public async Task GetPerson_ShouldReturnOKAndData_WhenHasData()
+    public async Task GetPerson_ShouldReturnDataAndOk_WhenHasData()
     {
         await _fixture.PersonRepository.CreateOneAsync(
             new() { FirstName = "Alexandre", LastName = "Borges" },

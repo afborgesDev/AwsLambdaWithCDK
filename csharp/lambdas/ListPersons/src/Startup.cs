@@ -12,5 +12,6 @@ public class Startup
     {
         services.AddAWSService<IAmazonDynamoDB>();
         services.AddSingleton<IPersonRepository, PersonRepository>();
+        services.AddSingleton<IOutboxRepository, OutboxRepository>();
     }
 }
